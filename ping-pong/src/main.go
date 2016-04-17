@@ -5,20 +5,19 @@ import (
 	"net"
 	"encoding/json"
 	"ndn/packet"
-	"bytes"
-	"time"
 	"crypto/rsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"ndn/packet/contentname"
 )
 
 func test() {
 	fmt.Println("-----------------")
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		fmt.Println("failed to generate key", err)
-	}
+	//privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	//if err != nil {
+	//	fmt.Println("failed to generate key", err)
+	//}
 	publicKey := privateKey.PublicKey
 
 	fmt.Println("public key", publicKey)
@@ -33,7 +32,7 @@ func test() {
 	if err != nil {
 		fmt.Println("failed to encrypt test", err)
 	}
-	receivedText, err := rsa.DecryptOAEP(hash, rand.Reader, privateKey, cipherText, label)
+	receivedText, err := rsa.DecryptOAEP(hash, rand.Reader, &privateKey, cipherText, label)
 
 	fmt.Println("data", data)
 	fmt.Println("encrypted", string(cipherText))
@@ -41,8 +40,21 @@ func test() {
 
 	fmt.Println("-----------------")
 }
+
+var privateKey rsa.PrivateKey
+
+const size = 2048
+
+func init() {
+	key, err := rsa.GenerateKey(rand.Reader, size)
+	if err != nil {
+		fmt.Println()
+		panic(1)
+	}
+	privateKey = *key
+}
 func main() {
-	test()
+	//test()
 	fmt.Println("NDN application demo - ping pong start")
 
 	/* connect to proxy */
@@ -57,24 +69,26 @@ func main() {
 
 	/* bind data name */
 	fmt.Println("bind data name")
-	b := new(bytes.Buffer)
-	contentName := packet.ContentName_s{}
-	p := packet.ServiceProviderPacket_s{
-		ContentName:contentName,
-		ExpireTime:time.Now().Add(time.Second * 10),
-		AllowCache:true,
-		PublicKey:"",
+	contentName := packet.ContentName_s{
+		Name:"ping",
+		Type:contentname.ExactMatch,
 	}
-	err = json.NewEncoder(b).Encode(p)
+	packet := packet.ServiceProviderPacket_s{
+		ContentName:contentName,
+		PublicKey:privateKey.PublicKey,
+	}
+	err = json.NewEncoder(conn).Encode(packet)
 	if (err != nil) {
 		fmt.Println("failed to encode packet into json bytes")
 		panic(2)
 	}
-	_, err = conn.Write(b.Bytes())
-	if (err != nil) {
-		fmt.Println("failed to send packet")
-		panic(3)
-	}
+	//_, err = conn.Write(b.Bytes())
+	//if (err != nil) {
+	//	fmt.Println("failed to send packet")
+	//	panic(3)
+	//} else {
+	fmt.Println("packet sent to proxy successfully")
+	//}
 
 	/* wait for request */
 	fmt.Println("wait for request")
