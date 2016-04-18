@@ -57,5 +57,3 @@ crashlytics-build.properties
 fabric.properties
 
 # custom
-.idea/
-ndn-application-demo.iml
