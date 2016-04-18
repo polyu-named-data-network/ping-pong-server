@@ -1,13 +1,13 @@
 package main
 
 import (
+  "bitbucket.org/polyu-named-data-network/ndn/packet"
+  "bitbucket.org/polyu-named-data-network/ndn/packet/contentname"
   "crypto/rand"
   "crypto/rsa"
   "encoding/json"
   "fmt"
   "io"
-  "ndn/packet"
-  "ndn/packet/contentname"
   "net"
 )
 

@@ -4,21 +4,27 @@ import (
   "crypto/rand"
   "crypto/rsa"
   "crypto/sha256"
-  "encoding/json"
   "fmt"
-  "io"
-  "ndn/packet"
-  "ndn/packet/contentname"
-  "net"
 )
 
 func test() {
   fmt.Println("-----------------")
 
+  const size = 2048
+
+  var privateKey rsa.PrivateKey
+  key, err := rsa.GenerateKey(rand.Reader, size)
+  if err != nil {
+    fmt.Println()
+    panic(1)
+  }
+  privateKey = *key
+
   //privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
   //if err != nil {
   //  fmt.Println("failed to generate key", err)
   //}
+
   publicKey := privateKey.PublicKey
 
   fmt.Println("public key", publicKey)
@@ -40,17 +46,4 @@ func test() {
   fmt.Println("decrypted", string(receivedText))
 
   fmt.Println("-----------------")
-}
-
-var privateKey rsa.PrivateKey
-
-const size = 2048
-
-func init() {
-  key, err := rsa.GenerateKey(rand.Reader, size)
-  if err != nil {
-    fmt.Println()
-    panic(1)
-  }
-  privateKey = *key
 }
