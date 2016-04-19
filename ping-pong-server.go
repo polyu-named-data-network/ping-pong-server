@@ -9,11 +9,20 @@ import (
   "fmt"
   "io"
   "net"
+  "sync"
+  "time"
 )
 
 var privateKey rsa.PrivateKey
 
-const size = 2048
+const (
+  size               = 2048
+  proxy_mode         = "tcp"
+  proxy_service_addr = "127.0.0.1:8125"
+  proxy_data_addr    = "127.0.0.1:8124"
+  allow_cache        = true
+  cache_time         = time.Second * 10
+)
 
 func init() {
   key, err := rsa.GenerateKey(rand.Reader, size)
@@ -23,19 +32,7 @@ func init() {
   }
   privateKey = *key
 }
-func main() {
-  //test()
-  fmt.Println("NDN application demo - ping-pong server start")
-
-  /* connect to proxy */
-  fmt.Println("connect to proxy")
-  conn, err := net.Dial("tcp", "127.0.0.1:8125")
-  if err != nil {
-    fmt.Println("failed to connect to proxy", err)
-    panic(1)
-  }
-  defer conn.Close()
-  fmt.Println("connected to proxy")
+func registerService(encoder json.Encoder) (err error) {
 
   /* bind data name */
   fmt.Println("bind data name")
@@ -47,31 +44,77 @@ func main() {
     ContentName: contentName,
     PublicKey:   privateKey.PublicKey,
   }
-  err = json.NewEncoder(conn).Encode(out_packet)
+  err = encoder.Encode(out_packet)
   if err != nil {
     fmt.Println("failed to encode packet into json bytes")
-    panic(2)
+    panic(3)
   }
   fmt.Println("packet sent to proxy successfully")
-
-  decoder := json.NewDecoder(conn)
+  return
+}
+func loopForInterestPacket(wg sync.WaitGroup, in json.Decoder, out json.Encoder) (err error) {
+  defer wg.Done()
   var in_packet packet.InterestPacket_s
   for err == nil {
-    fmt.Println("wait for incoming interest packet")
-    err = decoder.Decode(&in_packet)
+    /* wait for request */
+    fmt.Println("wait for request (incoming interest packet)")
+    err = in.Decode(&in_packet)
     if err != nil {
       if err != io.EOF {
-        fmt.Println("failed to decode incoming interest packet")
+        fmt.Println("failed to decode incoming interest packet", err)
       }
+      return nil
     } else {
       fmt.Println("received interest packet", in_packet)
+      if in_packet.ContentName.Name == "ping" {
+        onDataRequest(in_packet, out)
+      }
     }
   }
-  /* wait for request */
-  fmt.Println("wait for request")
-
+  return
+}
+func onDataRequest(in_packet packet.InterestPacket_s, out json.Encoder) {
   /* response data */
-  fmt.Println("response data")
+  fmt.Println("responsing data")
+  out_packet := packet.DataPacket_s{
+    ContentName:        in_packet.ContentName,
+    SeqNum:             in_packet.SeqNum,
+    AllowCache:         allow_cache && in_packet.AllowCache,
+    PublisherPublicKey: privateKey.PublicKey,
+  }
+  if out_packet.AllowCache {
+    out_packet.ExpireTime = time.Now().Add(cache_time)
+  }
+  out.Encode(out_packet)
+  fmt.Println("responsed data")
+}
+func main() {
+  //test()
+  fmt.Println("NDN application demo - ping-pong server start")
+  wg := sync.WaitGroup{}
 
+  /* init connection to proxy */
+  fmt.Println("connect to proxy")
+  serviceConn, err := net.Dial(proxy_mode, proxy_service_addr)
+  if err != nil {
+    fmt.Println("failed to connect to proxy service socket", err)
+    panic(1)
+  }
+  defer serviceConn.Close()
+  dataConn, err := net.Dial(proxy_mode, proxy_data_addr)
+  if err != nil {
+    fmt.Println("failed to connect to proxy data socket", err)
+    panic(2)
+  }
+  fmt.Println("connected to proxy")
+
+  /* bind service */
+  registerService(*json.NewEncoder(serviceConn))
+
+  /* wait for request */
+  wg.Add(1)
+  go loopForInterestPacket(wg, *json.NewDecoder(serviceConn), *json.NewEncoder(dataConn))
+
+  wg.Wait()
   fmt.Println("NDN application demo - ping-pong server end")
 }
