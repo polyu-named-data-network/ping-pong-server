@@ -36,7 +36,7 @@ func registerService(encoder json.Encoder) (err error) {
 
   /* bind data name */
   fmt.Println("bind data name")
-  contentName := packet.ContentName_s{
+  contentName := contentname.ContentName_s{
     Name: "ping",
     Type: contentname.ExactMatch,
   }
