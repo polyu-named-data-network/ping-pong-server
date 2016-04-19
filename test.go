@@ -7,7 +7,7 @@ import (
   "fmt"
 )
 
-func test() {
+func key_test() {
   fmt.Println("-----------------")
 
   const size = 2048
@@ -46,4 +46,12 @@ func test() {
   fmt.Println("decrypted", string(receivedText))
 
   fmt.Println("-----------------")
+}
+func byte_test() {
+  ContentData := []byte("pong")
+  fmt.Println("the content raw", ContentData)
+  fmt.Println("the content string", string(ContentData))
+}
+func main() {
+  byte_test()
 }

@@ -81,6 +81,7 @@ func onDataRequest(in_packet packet.InterestPacket_s, out json.Encoder) {
     SeqNum:             in_packet.SeqNum,
     AllowCache:         allow_cache && in_packet.AllowCache,
     PublisherPublicKey: privateKey.PublicKey,
+    ContentData:        []byte("pong"),
   }
   if out_packet.AllowCache {
     out_packet.ExpireTime = time.Now().Add(cache_time)
