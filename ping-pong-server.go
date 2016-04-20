@@ -7,6 +7,7 @@ import (
   "crypto/rsa"
   "encoding/json"
   "fmt"
+  "github.com/aabbcc1241/goutils/log"
   "io"
   "net"
   "sync"
@@ -16,12 +17,11 @@ import (
 var privateKey rsa.PrivateKey
 
 const (
-  size               = 2048
-  proxy_mode         = "tcp"
-  proxy_service_addr = "127.0.0.1:8125"
-  proxy_data_addr    = "127.0.0.1:8124"
-  allow_cache        = true
-  cache_time         = time.Second * 10
+  size        = 2048
+  proxy_mode  = "tcp"
+  proxy_addr  = "127.0.0.1:8123"
+  allow_cache = true
+  cache_time  = time.Second * 10
 )
 
 func init() {
@@ -37,17 +37,22 @@ func registerService(encoder json.Encoder) (err error) {
   /* bind data name */
   fmt.Println("bind data name")
   contentName := contentname.ContentName_s{
-    Name: "ping",
-    Type: contentname.ExactMatch,
+    Name:        "ping",
+    ContentType: contentname.ExactMatch,
+  }
+  publicKey, err := packet.ToPublicKey_s(privateKey.PublicKey)
+  if err != nil {
+    log.Error.Println(err)
+    panic(3)
   }
   out_packet := packet.ServiceProviderPacket_s{
     ContentName: contentName,
-    PublicKey:   privateKey.PublicKey,
+    PublicKey:   publicKey,
   }
   err = encoder.Encode(out_packet)
   if err != nil {
     fmt.Println("failed to encode packet into json bytes")
-    panic(3)
+    panic(4)
   }
   fmt.Println("packet sent to proxy successfully")
   return
@@ -76,11 +81,16 @@ func loopForInterestPacket(wg sync.WaitGroup, in json.Decoder, out json.Encoder)
 func onDataRequest(in_packet packet.InterestPacket_s, out json.Encoder) {
   /* response data */
   fmt.Println("responsing data")
+  publicKey, err := packet.ToPublicKey_s(privateKey.PublicKey)
+  if err != nil {
+    log.Error.Println(err)
+    panic(5)
+  }
   out_packet := packet.DataPacket_s{
     ContentName:        in_packet.ContentName,
     SeqNum:             in_packet.SeqNum,
     AllowCache:         allow_cache && in_packet.AllowCache,
-    PublisherPublicKey: privateKey.PublicKey,
+    PublisherPublicKey: publicKey,
     ContentData:        []byte("pong"),
   }
   if out_packet.AllowCache {
@@ -96,13 +106,13 @@ func main() {
 
   /* init connection to proxy */
   fmt.Println("connect to proxy")
-  serviceConn, err := net.Dial(proxy_mode, proxy_service_addr)
+  serviceConn, err := net.Dial(proxy_mode, proxy_addr)
   if err != nil {
     fmt.Println("failed to connect to proxy service socket", err)
     panic(1)
   }
   defer serviceConn.Close()
-  dataConn, err := net.Dial(proxy_mode, proxy_data_addr)
+  dataConn, err := net.Dial(proxy_mode, proxy_addr)
   if err != nil {
     fmt.Println("failed to connect to proxy data socket", err)
     panic(2)
